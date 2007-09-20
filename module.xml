@@ -12,7 +12,7 @@
 		<engine>asterisk 1.2</engine>
 	</depends>
 	<location>release/ldapcidlookup-1.3.0.3.tgz</location>
-	<md5sum>3c633027d46dbd51e66c67401839af77</md5sum>
+	<md5sum>49c5921fdc65f82e72214d5c5d2ea639</md5sum>
 	<changelog>
 		*1.3.0.3* Fixed ldapcidlookup.agi and added number format support
 		*1.3.0.2* Added ldap_prefix for short numbers.
