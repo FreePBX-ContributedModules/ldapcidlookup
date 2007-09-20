@@ -1,0 +1,75 @@
+#!/bin/sh
+# Lookup phone number via Domino LDAP and return name for callerid
+# v1.2
+
+#debugging
+#exec 2>>/tmp/cid.log
+#set -x
+
+# Configurable variables
+ldaphostname="localhost"
+ldapusername="ldap@localhost.net"
+ldappassword="ldap"
+ldapbase="DC=localhost,DC=net"
+ldapareacode=1
+format='(XX) XXXX-XXXX'
+
+# Temp file for LDAP search results
+tempfile=/tmp/file.txt
+
+declare -a array
+for ARG in "$@"; do
+        array=( $( echo $ARG | sed 's/=/ /' ) )
+	[[ "${array[0]}" = "HOST" ]] && ldaphostname="${array[1]}"
+	[[ "${array[0]}" = "USER" ]] && ldapusername="${array[1]}"
+	[[ "${array[0]}" = "PASS" ]] && ldappassword="${array[1]}"
+	[[ "${array[0]}" = "AREA" ]] && ldapareacode="${array[1]}"
+	[[ "${array[0]}" = "DN" ]] && ldapbase="$(echo ${array[1]}|tr '@' ',')"
+	[[ "${array[0]}" = "FORMAT" ]] && format="$(echo ${array[1]}|tr '@' ' ')"
+done
+
+# Process incoming variables from Asterisk AGI
+declare -a array
+while read -e ARG && [ "$ARG" ] ; do
+        array=( $( echo $ARG | sed 's/://' ) )
+        export ${array[0]}=${array[1]}
+done
+
+# Grab caller ID
+num=$agi_callerid
+
+# Formst mapping
+export num_f="$( echo $num|awk '{a=FORMAT;n=length($1);for(i=1;i<=n;i++){sub("X",substr($1,i,1),a)};gsub("\\(","\\(",a);gsub(")","\\)",a);print a}' FORMAT="$format" )"
+
+# Save caller ID in 'num_p', then strip the
+# area code if it matches the local area code
+len=${#ldapareacode}
+num_p=$num
+
+if [[ "${num:0:$len}" == "$ldapareacode" ]]; then
+	num_p=${num:$len}
+fi
+
+# Build LDAP search filter
+searchstr="(|"
+for n in mobile phonenumber telephonenumber; do
+	for m in ${num:+num} ${num_p:+num_p} ${num_f:+num_f}; do
+		eval searchstr="\"\${searchstr}(\${n}=\${$m})\""
+	done
+done
+searchstr="${searchstr})"
+
+# Perform ldap search
+/usr/bin/ldapsearch -h $ldaphostname -b "$ldapbase" -D "$ldapusername" -w "$ldappassword" -x -LLL "$searchstr" givenname sn >> $tempfile
+
+# Extract Results
+lastname=$(grep '^sn:' $tempfile | cut -d ":" -f 2- | sed 's/^ //'|tr -d '\012')
+firstname=$(grep '^givenName:' $tempfile | cut -d ":" -f 2- | sed 's/^ //'|tr -d '\012')
+rm $tempfile
+
+# Export results to ASTERISK
+CIDNAME="$firstname"
+[[ -n $lastname ]] && CIDNAME="$CIDNAME $lastname"
+[ ${#CIDNAME} -lt 2 ] || echo "SET CALLERID \"$CIDNAME\"<$agi_callerid>"
+
+exit 0;
