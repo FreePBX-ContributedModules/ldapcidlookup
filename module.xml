@@ -4,7 +4,7 @@
 	<version>1.3.0.3</version>
 	<description>Allows Caller ID Lookup of incoming calls against different sources (MySQL, HTTP, ENUM, Phonebook Module and LDAP)</description>
 	<type>setup</type>
-	<category>Inbound Call Control</category>
+	<category>Third Party Addon</category>
 	<menuitems>
 		<ldapcidlookup>LDAP CallerID Lookup Sources</ldapcidlookup>
 	</menuitems>
